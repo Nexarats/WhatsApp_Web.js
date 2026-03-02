@@ -12,221 +12,190 @@ function formatPhone(phone) {
     return finalNumber + "@c.us";
 }
 
-// 0. Emergency wipe all
-router.post("/whatsapp/clear-all", async (req, res) => {
-    try {
-        await SessionManager.clearAllSessions();
-        res.json({ success: true, message: "All sessions and entire Whatsapp auth cache safely wiped out." });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+// 🎉 SINGLE ENDPOINT RPC ROUTER
+router.all("/whatsapp", async (req, res) => {
+    // Determine action and sessionId from either the payload root, a 'data' object, or URL query
+    const action = req.body?.action || req.query?.action;
+    const sessionId = req.body?.sessionId || req.query?.sessionId || "default";
+
+    if (!action) {
+        return res.status(400).json({ error: "Missing 'action' parameter explicitly. (E.g. { \"action\": \"start\" })" });
     }
-});
 
-// Middleware to inject session using the :sessionId param from URL OR default if missing
-router.use(["/whatsapp/:sessionId", "/whatsapp"], (req, res, next) => {
-    // If no sessionId is provided in URL params or body, we fallback to 'default'
-    const sessionId = req.params.sessionId || req.body.sessionId || "default";
-    const session = SessionManager.getSession(sessionId);
-    req.sessionData = session;
-    req.mappedSessionId = sessionId;
-    next();
-});
-
-// 1. boot / start session
-router.all("/whatsapp/:sessionId/start", async (req, res) => {
-    const { sessionId } = req.params;
-    const session = SessionManager.getSession(sessionId);
-    if (session) {
-        return res.json({ success: true, message: `Session ${sessionId} is already active`, status: session.status });
-    }
-    await SessionManager.createSession(sessionId);
-    res.json({ success: true, message: `Session ${sessionId} initializing...` });
-});
-
-// 2. getStatus
-router.get("/whatsapp/:sessionId/status", (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found. Calling /start first." });
-
-    res.json({
-        sessionId: req.sessionData.id,
-        ready: req.sessionData.ready,
-        status: req.sessionData.status,
-    });
-});
-
-// 3. getQr
-router.get("/whatsapp/:sessionId/qr", (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-
-    res.json({
-        sessionId: req.sessionData.id,
-        qrDataUrl: req.sessionData.qr,
-        hasQr: !!req.sessionData.qr,
-        ready: req.sessionData.ready,
-        status: req.sessionData.status
-    });
-});
-
-// 4. send(data) - text messages
-router.post("/whatsapp/:sessionId/send", async (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-    if (!req.sessionData.ready) return res.status(503).json({ error: "WhatsApp not connected" });
-
-    const { phone, message } = req.body;
-    if (!phone || !message) return res.status(400).json({ error: "Missing phone or message" });
-
-    try {
-        const targetNumber = formatPhone(phone);
-        const isRegistered = await req.sessionData.client.isRegisteredUser(targetNumber);
-
-        if (!isRegistered) {
-            return res.status(400).json({ error: "Number not registered on WhatsApp" });
+    // 0. Emergency wipe (does not depend on session)
+    if (action === "clear-all") {
+        try {
+            await SessionManager.clearAllSessions();
+            return res.json({ success: true, message: "All sessions and entire Whatsapp auth cache safely wiped out." });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
         }
-
-        const response = await req.sessionData.client.sendMessage(targetNumber, message);
-        res.json({ success: true, messageId: response.id._serialized });
-    } catch (error) {
-        console.error("SEND ERROR:", error);
-        res.status(500).json({ error: error.message });
     }
-});
 
-// 5. sendReceipt(to, receipt) - media/docs
-router.post("/whatsapp/:sessionId/send-receipt", async (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-    if (!req.sessionData.ready) return res.status(503).json({ error: "WhatsApp not connected" });
-
-    const { phone, base64Data, mimetype, filename, caption } = req.body;
-
-    if (!phone || !base64Data) {
-        return res.status(400).json({ error: "Missing phone or base64Data" });
-    }
+    // Grab or create session conditionally
+    let session = SessionManager.getSession(sessionId);
 
     try {
-        const targetNumber = formatPhone(phone);
-        const isRegistered = await req.sessionData.client.isRegisteredUser(targetNumber);
-        if (!isRegistered) return res.status(400).json({ error: "Number not registered on WhatsApp" });
-
-        const pureBase64 = base64Data.includes("base64,") ? base64Data.split("base64,")[1] : base64Data;
-        const mt = mimetype || "application/pdf";
-        const fn = filename || "receipt.pdf";
-
-        const media = new MessageMedia(mt, pureBase64, fn);
-        const sendOptions = caption ? { caption } : {};
-
-        const response = await req.sessionData.client.sendMessage(targetNumber, media, sendOptions);
-        res.json({ success: true, messageId: response.id._serialized });
-    } catch (error) {
-        console.error("SEND RECEIPT ERROR:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 6. sendBulk(messages[])
-router.post("/whatsapp/:sessionId/send-bulk", async (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-    if (!req.sessionData.ready) return res.status(503).json({ error: "WhatsApp not connected" });
-
-    const { messages } = req.body;
-    if (!Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ error: "Messages array is required" });
-    }
-
-    res.json({ success: true, status: "Processing in background", total: messages.length });
-
-    const client = req.sessionData.client;
-    (async () => {
-        for (const item of messages) {
-            try {
-                if (!item.phone || !item.message) continue;
-                const targetNumber = formatPhone(item.phone);
-
-                const randomDelay = Math.floor(Math.random() * 3000) + 2000;
-                await new Promise(resolve => setTimeout(resolve, randomDelay));
-
-                const isRegistered = await client.isRegisteredUser(targetNumber);
-                if (isRegistered) {
-                    await client.sendMessage(targetNumber, item.message);
+        switch (action) {
+            case "start":
+                if (session) {
+                    return res.json({ success: true, message: `Session ${sessionId} is already active`, status: session.status });
                 }
-            } catch (err) { }
+                await SessionManager.createSession(sessionId);
+                return res.json({ success: true, message: `Session ${sessionId} initializing...` });
+
+            case "status":
+                if (!session) return res.status(404).json({ error: "Session not found. Calling 'start' action first." });
+                return res.json({
+                    sessionId: session.id,
+                    ready: session.ready,
+                    status: session.status,
+                });
+
+            case "qr":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                return res.json({
+                    sessionId: session.id,
+                    qrDataUrl: session.qr,
+                    hasQr: !!session.qr,
+                    ready: session.ready,
+                    status: session.status
+                });
+
+            case "send":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
+
+                var phone = req.body?.phone || req.body?.data?.phone;
+                var message = req.body?.message || req.body?.data?.message;
+
+                if (!phone || !message) return res.status(400).json({ error: "Missing phone or message parameter" });
+
+                var targetNumber = formatPhone(phone);
+                var isRegistered = await session.client.isRegisteredUser(targetNumber);
+
+                if (!isRegistered) {
+                    return res.status(400).json({ error: "Number not registered on WhatsApp" });
+                }
+
+                var response = await session.client.sendMessage(targetNumber, message);
+                return res.json({ success: true, messageId: response.id._serialized });
+
+            case "send-receipt":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
+
+                var base64Data = req.body?.base64Data || req.body?.data?.base64Data;
+                var phoneR = req.body?.phone || req.body?.data?.phone;
+                var mimetype = req.body?.mimetype || req.body?.data?.mimetype;
+                var filename = req.body?.filename || req.body?.data?.filename;
+                var caption = req.body?.caption || req.body?.data?.caption;
+
+                if (!phoneR || !base64Data) {
+                    return res.status(400).json({ error: "Missing phone or base64Data parameter" });
+                }
+
+                var tNumber = formatPhone(phoneR);
+                var isRegR = await session.client.isRegisteredUser(tNumber);
+                if (!isRegR) return res.status(400).json({ error: "Number not registered on WhatsApp" });
+
+                var pureBase64 = base64Data.includes("base64,") ? base64Data.split("base64,")[1] : base64Data;
+                var mt = mimetype || "application/pdf";
+                var fn = filename || "receipt.pdf";
+
+                var media = new MessageMedia(mt, pureBase64, fn);
+                var sendOptions = caption ? { caption } : {};
+
+                var responseR = await session.client.sendMessage(tNumber, media, sendOptions);
+                return res.json({ success: true, messageId: responseR.id._serialized });
+
+            case "send-bulk":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
+
+                var messages = req.body?.messages || req.body?.data?.messages;
+                if (!Array.isArray(messages) || messages.length === 0) {
+                    return res.status(400).json({ error: "Messages array is required" });
+                }
+
+                res.json({ success: true, status: "Processing in background", total: messages.length });
+
+                var sClient = session.client;
+                (async () => {
+                    for (const item of messages) {
+                        try {
+                            if (!item.phone || !item.message) continue;
+                            const tn = formatPhone(item.phone);
+
+                            const randomDelay = Math.floor(Math.random() * 3000) + 2000;
+                            await new Promise(resolve => setTimeout(resolve, randomDelay));
+
+                            const isReg = await sClient.isRegisteredUser(tn);
+                            if (isReg) {
+                                await sClient.sendMessage(tn, item.message);
+                            }
+                        } catch (err) { }
+                    }
+                })();
+                return;
+
+            case "messages":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
+
+                var chatPhone = req.body?.phone || req.body?.data?.phone || req.query?.phone;
+                var fetchLimit = parseInt(req.body?.limit || req.body?.data?.limit || req.query?.limit) || 20;
+
+                if (!chatPhone) return res.status(400).json({ error: "Phone number parameter is required" });
+
+                var targetChatPhone = formatPhone(chatPhone);
+                var chat = await session.client.getChatById(targetChatPhone);
+
+                var chatMessages = await chat.fetchMessages({ limit: fetchLimit });
+
+                var cleanedMessages = chatMessages.map(m => ({
+                    id: m.id._serialized,
+                    body: m.body,
+                    fromMe: m.fromMe,
+                    type: m.type,
+                    timestamp: m.timestamp,
+                    hasMedia: m.hasMedia
+                }));
+
+                return res.json({ success: true, messages: cleanedMessages });
+
+            case "pair":
+                if (!session) return res.status(404).json({ error: "Session not found. Call 'start' first." });
+                var pPhone = req.body?.phone || req.body?.data?.phone;
+                if (!pPhone) return res.status(400).json({ error: "Phone number parameter is required" });
+
+                if (session.ready) {
+                    return res.status(400).json({ error: "WhatsApp is already connected." });
+                }
+                var code = await session.client.requestPairingCode(String(pPhone).replace(/\D/g, ""));
+                return res.json({ success: true, pairingCode: code });
+
+            case "logout":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                await SessionManager.deleteSession(sessionId);
+                return res.json({ success: true, message: `Session ${sessionId} logged out and completely deleted.` });
+
+            case "restart":
+                if (!session) return res.status(404).json({ error: "Session not found." });
+                res.json({ success: true, message: `Restarting session ${sessionId}...` });
+                setTimeout(async () => {
+                    await SessionManager.deleteSession(sessionId);
+                    SessionManager.createSession(sessionId);
+                }, 1000);
+                return;
+
+            default:
+                return res.status(400).json({ error: `Unknown action: '${action}'` });
         }
-    })();
-});
-
-// 7. getMessages(params?)
-router.get("/whatsapp/:sessionId/messages", async (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-    if (!req.sessionData.ready) return res.status(503).json({ error: "WhatsApp not connected" });
-
-    const { phone, limit } = req.query;
-    if (!phone) return res.status(400).json({ error: "Phone number is required" });
-
-    try {
-        const targetNumber = formatPhone(phone);
-        const chat = await req.sessionData.client.getChatById(targetNumber);
-
-        const fetchLimit = parseInt(limit) || 20;
-        const messages = await chat.fetchMessages({ limit: fetchLimit });
-
-        const cleanedMessages = messages.map(m => ({
-            id: m.id._serialized,
-            body: m.body,
-            fromMe: m.fromMe,
-            type: m.type,
-            timestamp: m.timestamp,
-            hasMedia: m.hasMedia
-        }));
-
-        res.json({ success: true, messages: cleanedMessages });
     } catch (error) {
-        console.error("GET MESSAGES ERROR:", error);
-        res.status(500).json({ error: error.message || "Failed to fetch messages or chat does not exist" });
+        console.error(`[${sessionId}] ACTION ERROR (${action}):`, error);
+        return res.status(500).json({ error: error.message });
     }
-});
-
-// 8. requestPairingCode(phone)
-router.post("/whatsapp/:sessionId/pair", async (req, res) => {
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found. Call /start first." });
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: "Phone number is required" });
-
-    try {
-        if (req.sessionData.ready) {
-            return res.status(400).json({ error: "WhatsApp is already connected." });
-        }
-        const code = await req.sessionData.client.requestPairingCode(String(phone).replace(/\D/g, ""));
-        res.json({ success: true, pairingCode: code });
-    } catch (error) {
-        console.error("PAIRING ERROR:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 9. logout()
-router.post("/whatsapp/:sessionId/logout", async (req, res) => {
-    const { sessionId } = req.params;
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-
-    try {
-        await SessionManager.deleteSession(sessionId);
-        res.json({ success: true, message: `Session ${sessionId} logged out and deleted completely` });
-    } catch (error) {
-        console.error("LOGOUT ERROR:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 10. restart()
-router.post("/whatsapp/:sessionId/restart", async (req, res) => {
-    const { sessionId } = req.params;
-    if (!req.sessionData) return res.status(404).json({ error: "Session not found." });
-
-    res.json({ success: true, message: `Restarting session ${sessionId}...` });
-
-    setTimeout(async () => {
-        await SessionManager.deleteSession(sessionId);
-        SessionManager.createSession(sessionId);
-    }, 1000);
 });
 
 module.exports = router;

@@ -1,29 +1,21 @@
-# Multi-Session WhatsApp API Microservice 🚀
+# Single Endpoint WhatsApp API Microservice 🚀
 
-A highly concurrent, headless WhatsApp API microservice powered by `whatsapp-web.js` and Express.js. Designed to manage multiple completely isolated WhatsApp sessions from a single central codebase.
+A highly concurrent, headless WhatsApp API microservice powered by `whatsapp-web.js` and Express.js. Designed to manage multiple completely isolated WhatsApp sessions from a single unified API Gateway.
 
-## 🌟 Multi-Session Architecture
+## 🌟 Single Endpoint Architecture (RPC Data-Driven)
 
-By abstracting sessions into unique IDs mappings (e.g. `clientA`, `clientB`, `marketingTeam`, `supportTeam`), this microservice can run multiple WhatsApp accounts on a single container! 
-But it also fully supports operating as a **simple, default single-user instance** without needing to supply an ID!
+This API relies on a single **Unified URL**:
+**Format:** `POST /api/whatsapp`
 
-### 👤 Option A: Single-User Workflow (No Session ID)
+Instead of hitting different routes like `/send` or `/qr`, you just send a JSON payload with an `action` attribute.
 
-If you just need a standard WhatsApp bot for yourself, skip the `sessionId` param! The API automatically routes you to a background session called `default`.
+### 🔑 Basic Workflow (Single or Multi-User)
 
-1. **Start Server:** `GET /api/whatsapp/start`
-2. **Scan QR:** `GET /api/whatsapp/qr`
-3. **Send Message:** `POST /api/whatsapp/send` with `{ "phone": "123...", "message": "Hi" }`
+To use the service, simply send a POST request with the desired action. If you need to isolate numbers (multi-user), include a `sessionId`. If you omit `sessionId`, it defaults to `default`.
 
----
-
-### � Option B: Multi-User Workflow (4+ Persons Concurrency)
-
-If 4 people need to use this without stepping on each other's toes, simply slide a `:sessionId` variable into the URL paths:
-
-1. **Start Server (Person A):** `GET /api/whatsapp/personA/start`
-2. **Scan QR (Person A):** `GET /api/whatsapp/personA/qr`
-3. **Person B:** Person B can do the exact same thing independently using `/api/whatsapp/personB/start`! They will never overlap.
+1. **Start Session:** `POST /api/whatsapp` with `{ "action": "start", "sessionId": "optional_id" }`
+2. **Get QR Code:** `POST /api/whatsapp` with `{ "action": "qr", "sessionId": "optional_id" }`
+3. **Send Message:** `POST /api/whatsapp` with `{ "action": "send", "sessionId": "optional_id", "phone": "123...", "message": "Hi" }`
 
 ---
 
@@ -46,7 +38,7 @@ You can deploy this API to Vercel instantly using the attached `vercel.json`!
 Vercel freezes functions the millisecond your request returns a response (or drops it after a 10s-60s timeout limit). WhatsApp bots require a persistent, 24/7 background long-polling socket connection.
 **If deployed directly to Vercel Serverless:**
 1. Background incoming messages will NOT be retrieved reliably as the Lambda container goes to sleep.
-2. Initializing `puppeteer` (Headless browser) takes exactly 10-15s, which exceeds Vercel Hobby tier timeout limits (meaning `/start` might hang depending on your plan tier!).
+2. Initializing `puppeteer` (Headless browser) takes exactly 10-15s, which exceeds Vercel Hobby tier timeout limits (meaning `start` might hang depending on your plan tier!).
 
 ### ✅ Better Deployment Options (For 24/7 Online Bots)
 
@@ -56,20 +48,25 @@ For the absolute best production-grade reliability (keeping the underlying Chrom
 - **Render.com** (Highly scalable, similar execution node styles to Railway, supports websockets perfectly).
 - **Digital Ocean / AWS EC2** (Standard Linux VPS).
 
-Simply upload the codebase, run `npm install`, and `npm start` (`node server.js`), and your 4 developers can reliably utilize the endpoints concurrently without any sleep-wake cycle lags!
+Simply upload the codebase, run `npm install`, and `npm run start` (`node server.js`).
 
 ---
 
-## ⚡ API Endpoints Quick Reference
+## ⚡ API Action Reference
 
-You can either hit the root `/api/whatsapp/...` (for default single-user), OR hit `/api/whatsapp/:sessionId/...` (for isolated multi-user mode). 
+**Send all requests as `POST` to `/api/whatsapp`:**
 
-- **Start Client:** `GET /api/whatsapp/start`  *(or `/api/whatsapp/:sessionId/start`)*
-- **Session Status:** `GET /api/whatsapp/status`
-- **Get QR Code:** `GET /api/whatsapp/qr`
-- **Request Pair Code:** `POST /api/whatsapp/pair { "phone": "98765..." }`
-- **Send Msg:** `POST /api/whatsapp/send { "phone": "...", "message": "Hi" }`
-- **Send Receipt (Base64 file):** `POST /api/whatsapp/send-receipt`
-- **Fetch Chat History:** `GET /api/whatsapp/messages?phone=919876543210&limit=50`
-- **Logout Client:** `POST /api/whatsapp/logout`
-- **Emergency Session Wipe:** `POST /api/whatsapp/clear-all` (Wipes all sessions globally)
+- **Start Client:** `{ "action": "start", "sessionId": "..." }`
+- **Session Status:** `{ "action": "status" }`
+- **Get QR Code:** `{ "action": "qr" }`
+- **Request Pair Code:** `{ "action": "pair", "phone": "98765..." }`
+- **Send Msg:** `{ "action": "send", "phone": "...", "message": "Hi" }`
+- **Send Receipt (Base64 file):** `{ "action": "send-receipt", "phone": "...", "base64Data": "..." }`
+- **Fetch Chat History:** `{ "action": "messages", "phone": "919876543210", "limit": 50 }`
+- **Logout Client:** `{ "action": "logout" }`
+- **Emergency Session Wipe:** `{ "action": "clear-all" }` (Wipes all sessions globally)
+
+---
+
+## 📖 Interactive Documentation
+Visit `http://localhost:5000/docs` to see the full interactive documentation.

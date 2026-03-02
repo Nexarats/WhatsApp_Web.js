@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Session WhatsApp API Docs</title>
+    <title>WhatsApp Multi-Session API Docs (RPC/Single Endpoint)</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,9 +21,7 @@
             --border: #d1d7db;
             --code-bg: #1e1e1e;
             --code-text: #d4d4d4;
-            --method-get: #61affe;
             --method-post: #49cc90;
-            --method-all: #8b5cf6;
         }
 
         * {
@@ -79,6 +77,26 @@
             font-weight: 600;
         }
 
+        .global-endpoint {
+            background: #e6f4ea;
+            border: 2px solid var(--primary);
+            padding: 1.5rem;
+            margin: 2rem auto;
+            max-width: 900px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .global-endpoint code {
+            font-family: monospace;
+            background: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: var(--method-post);
+        }
+
         .container {
             max-width: 900px;
             margin: 2rem auto;
@@ -110,41 +128,15 @@
             background-color: #fafbfc;
         }
 
-        .method {
-            font-size: 0.85rem;
+        .action-tag {
+            font-size: 0.95rem;
             font-weight: 700;
-            padding: 0.35rem 0.75rem;
+            padding: 0.4rem 0.85rem;
             border-radius: 6px;
+            background-color: var(--primary);
             color: white;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .method.get {
-            background-color: var(--method-get);
-        }
-
-        .method.post {
-            background-color: var(--method-post);
-        }
-
-        .method.all {
-            background-color: var(--method-all);
-        }
-
-        .path {
             font-family: monospace;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-main);
-            word-break: break-all;
-        }
-
-        .path .param {
-            color: #d32f2f;
-            background: #ffebee;
-            padding: 0 4px;
-            border-radius: 4px;
+            letter-spacing: 0.5px;
         }
 
         .endpoint-body {
@@ -176,6 +168,7 @@
             font-family: 'Consolas', monospace;
             margin-bottom: 1.5rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            line-height: 1.4;
         }
 
         pre:last-child {
@@ -202,7 +195,7 @@
             font-family: monospace;
             font-weight: 600;
             color: var(--primary-dark);
-            min-width: 120px;
+            min-width: 140px;
         }
 
         .prop-desc {
@@ -219,14 +212,8 @@
         }
 
         @media (max-width: 600px) {
-            .endpoint-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.5rem;
-            }
-
             .prop-name {
-                min-width: 100px;
+                min-width: 110px;
             }
         }
     </style>
@@ -235,21 +222,26 @@
 <body>
 
     <header>
-        <h1>WhatsApp Multi-Session API v2</h1>
-        <p>A highly concurrent, isolated whatsapp microservice designed to handle multiple connections simultaneously
-            without overlap.</p>
+        <h1>WhatsApp Unified API Layer (RPC)</h1>
+        <p>Highly concurrent, one-endpoint payload-based architecture built to scale to thousands of users instantly.
+        </p>
     </header>
+
+    <div class="global-endpoint">
+        Target URL: <code>POST /api/whatsapp</code>
+    </div>
 
     <div class="highlight-notice">
         <strong>⚠️ Architecture Note:</strong>
         <br><br>
-        <strong>For Single Users:</strong> You do NOT need a session ID! Simply call the root endpoints directly (e.g.,
-        <code>/api/whatsapp/start</code>). The system will automatically link you to a default bot session.
+        <strong>1 Unified URL:</strong> You only ever make POST requests to <code>/api/whatsapp</code>! Tell the server
+        what to do by providing an <code>"action"</code> property in your JSON body.
         <br><br>
-        <strong>For Multi-Tenant Usage:</strong> You can isolate different WhatsApp numbers parallelly by adding a
-        dynamic <code>:sessionId</code> parameter in the URL. For example, "John" can use
-        <code>/api/whatsapp/john/start</code> and "Jane" can use <code>/api/whatsapp/jane/start</code> to safely
-        isolate data sets simultaneously!
+        <strong>Single Tenant:</strong> You do NOT need a session ID! The system automatically hooks you to a singleton
+        "default" bot layer.
+        <br><br>
+        <strong>Multi Tenant Isolation:</strong> If 4 employees are using this simultaneously, attach a
+        <code>"sessionId": "personA"</code> to your JSON body payload to ensure environments never overlap!
     </div>
 
     <div class="container">
@@ -257,18 +249,17 @@
         <!-- Boot Session -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method all">GET/POST</span>
-                <span class="path">/api/whatsapp/<strong>[<span class="param">:sessionId</span>]</strong>/start</span>
+                <span class="action-tag">"action": "start"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Spins up a headless Chromium container strictly isolated for the string provided in `:sessionId`.
-                    You must run this ONCE before any other commands mapping to this session ID.
+                    Spins up a headless Chromium container strictly isolated for you. You must run this action ONCE
+                    before utilizing other actions.
                 </div>
-                <div class="section-title">Response Example</div>
+                <div class="section-title">Request Body Example</div>
                 <pre>{
-    "success": true,
-    "message": "Session marketingTeam initializing..."
+    "action": "start",
+    "sessionId": "personA" // Optional for multi-tenant
 }</pre>
             </div>
         </div>
@@ -276,18 +267,16 @@
         <!-- Status -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method get">GET</span>
-                <span class="path">/api/whatsapp/<strong>[<span class="param">:sessionId</span>]</strong>/status</span>
+                <span class="action-tag">"action": "status"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Returns the connection state for the specific isolated session.
+                    Returns the connection state for your active session background worker.
                 </div>
-                <div class="section-title">Response Example</div>
+                <div class="section-title">Request Body Example</div>
                 <pre>{
-    "sessionId": "marketingTeam",
-    "ready": true,
-    "status": "connected"
+    "action": "status",
+    "sessionId": "personA"
 }</pre>
             </div>
         </div>
@@ -295,104 +284,93 @@
         <!-- QR Code -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method get">GET</span>
-                <span class="path">/api/whatsapp/<strong>[<span class="param">:sessionId</span>]</strong>/qr</span>
+                <span class="action-tag">"action": "qr"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
                     Retrieves the QR code base64 image (if the given session is awaiting to be scanned). Note that
-                    puppeteer boot takes up to 8 seconds so the QR may instantly not be available upon calling `/start`.
+                    puppeteer boot takes up to 8 seconds so the QR may jump asynchronously.
                 </div>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "qr",
+    "sessionId": "personA"
+}</pre>
             </div>
         </div>
 
         <!-- Pairing Code -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method post">POST</span>
-                <span class="path">/api/whatsapp/<strong>[<span class="param">:sessionId</span>]</strong>/pair</span>
+                <span class="action-tag">"action": "pair"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Alternative code pairing. Generates an 8-digit OTP string. (Client session must be initialized but
-                    NOT already connected).
+                    Alternative 8-digit OTP string pairing login using a phone number.
                 </div>
-                <div class="section-title">Body Parameters</div>
-                <ul class="property-list">
-                    <li>
-                        <span class="prop-name">phone</span>
-                        <span class="prop-desc">Phone to pair.<span class="prop-req">Required</span></span>
-                    </li>
-                </ul>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "pair",
+    "sessionId": "personA",
+    "phone": "919876543210"
+}</pre>
             </div>
         </div>
 
         <!-- Send Message -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method post">POST</span>
-                <span class="path">/api/whatsapp/<strong>[<span class="param">:sessionId</span>]</strong>/send</span>
+                <span class="action-tag">"action": "send"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Sends a text message using the specified connection pipeline.
+                    Triggers a message dispatch over your specific linked socket infrastructure.
                 </div>
-                <div class="section-title">Body Parameters</div>
-                <ul class="property-list">
-                    <li>
-                        <span class="prop-name">phone</span>
-                        <span class="prop-desc">Target phone.<span class="prop-req">Required</span></span>
-                    </li>
-                    <li>
-                        <span class="prop-name">message</span>
-                        <span class="prop-desc">Text.<span class="prop-req">Required</span></span>
-                    </li>
-                </ul>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "send",
+    "sessionId": "personA",
+    "phone": "919876543210",
+    "message": "Hello from the new RPC architecture!"
+}</pre>
             </div>
         </div>
 
         <!-- Send Media -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method post">POST</span>
-                <span class="path">/api/whatsapp/<strong>[<span
-                            class="param">:sessionId</span>]</strong>/send-receipt</span>
+                <span class="action-tag">"action": "send-receipt"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Sends a document/image utilizing Base64 binary.
+                    Transmits a Base64-encoded file (like PDF, Image, etc) directly via node protocol buffers.
                 </div>
-                <div class="section-title">Body Parameters</div>
-                <ul class="property-list">
-                    <li>
-                        <span class="prop-name">phone</span>
-                        <span class="prop-desc">Target phone.<span class="prop-req">Required</span></span>
-                    </li>
-                    <li>
-                        <span class="prop-name">base64Data</span>
-                        <span class="prop-desc">Binary base64.<span class="prop-req">Required</span></span>
-                    </li>
-                    <li>
-                        <span class="prop-name">mimetype</span>
-                        <span class="prop-desc">E.g., "application/pdf"</span>
-                    </li>
-                </ul>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "send-receipt",
+    "sessionId": "personA",
+    "phone": "919876543210",
+    "base64Data": "JVBERi0xLjQK...",
+    "mimetype": "application/pdf",
+    "filename": "invoice_123.pdf",
+    "caption": "Here is your invoice!"
+}</pre>
             </div>
         </div>
 
         <!-- Send Bulk -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method post">POST</span>
-                <span class="path">/api/whatsapp/<strong>[<span
-                            class="param">:sessionId</span>]</strong>/send-bulk</span>
+                <span class="action-tag">"action": "send-bulk"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Background throttled mass-messaging utilizing the specified session worker.
+                    Background throttled mass-messaging array system that dodges WhatsApp rate limiting algorithms.
                 </div>
-                <div class="section-title">Request Example</div>
+                <div class="section-title">Request Body Example</div>
                 <pre>{
+    "action": "send-bulk",
+    "sessionId": "personA",
     "messages": [
         { "phone": "1234567890", "message": "Offer A" },
         { "phone": "0987654321", "message": "Offer B" }
@@ -404,45 +382,55 @@
         <!-- Get Chat -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method get">GET</span>
-                <span class="path">/api/whatsapp/<strong>[<span
-                            class="param">:sessionId</span>]</strong>/messages</span>
+                <span class="action-tag">"action": "messages"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
                     Extracts recent chat history from a thread.
                 </div>
-                <div class="section-title">Usage Example</div>
-                <pre>GET /api/whatsapp/john/messages?phone=9876543210&limit=15</pre>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "messages",
+    "sessionId": "personA",
+    "phone": "919876543210",
+    "limit": 50
+}</pre>
             </div>
         </div>
 
         <!-- Logout/Destroy -->
         <div class="endpoint-card">
             <div class="endpoint-header">
-                <span class="method post">POST</span>
-                <span class="path">/api/whatsapp/<strong>[<span class="param">:sessionId</span>]</strong>/logout</span>
+                <span class="action-tag">"action": "logout"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    Safely disconnects this specific session from WhatsApp, kills the puppeteer browser safely, and
-                    erases local session memory allowing it to be spun up freshly again next time.
+                    Gracefully unbinds the local socket instance, dumps ram pointers, and kills matching background
+                    node.js threads for the specific session ID specified in the payload.
                 </div>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "logout",
+    "sessionId": "personA"
+}</pre>
             </div>
         </div>
 
         <!-- Emergency Clear All -->
         <div class="endpoint-card" style="border-left: 4px solid #d32f2f;">
             <div class="endpoint-header">
-                <span class="method post" style="background-color: #d32f2f;">POST</span>
-                <span class="path">/api/whatsapp/clear-all</span>
+                <span class="action-tag" style="background-color: #d32f2f;">"action": "clear-all"</span>
             </div>
             <div class="endpoint-body">
                 <div class="description">
-                    <strong>GLOBAL EMERGENCY WIPE.</strong> Destroys every single isolated session concurrently running,
-                    completely wipes the local folder cache of WhatsApp Auth data, and releases all system RAM memory.
-                    Do not pass a session ID to this!
+                    <strong>GLOBAL EMERGENCY NODE RESET.</strong> Sends a master kill signal traversing all session maps
+                    locally, terminates any dangling chromium memory hooks, and dumps physical disk auth cache folders
+                    out of root.
                 </div>
+                <div class="section-title">Request Body Example</div>
+                <pre>{
+    "action": "clear-all"
+}</pre>
             </div>
         </div>
 
