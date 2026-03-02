@@ -3,6 +3,8 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const apiRoutes = require("./src/routes");
 
+const path = require("path");
+
 const app = express();
 
 // Increase JSON limit depending on base64 payloads size
@@ -16,6 +18,11 @@ app.get("/", (req, res) => {
 
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
+});
+
+// API Docs redirect
+app.get("/api/docs", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "api-docs.html"));
 });
 
 // Setup Mount point

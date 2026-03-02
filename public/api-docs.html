@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Session WhatsApp API Docs</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #128C7E;
+            --primary-dark: #075E54;
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-main: #111b21;
+            --text-muted: #667781;
+            --border: #d1d7db;
+            --code-bg: #1e1e1e;
+            --code-text: #d4d4d4;
+            --method-get: #61affe;
+            --method-post: #49cc90;
+            --method-all: #8b5cf6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 2.5rem 0;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .highlight-notice {
+            background: #fff8e1;
+            border-left: 4px solid #ffb300;
+            padding: 1rem 1.5rem;
+            margin: 2rem auto;
+            max-width: 900px;
+            border-radius: 0 8px 8px 0;
+            color: #333;
+            font-size: 0.95rem;
+        }
+
+        .highlight-notice code {
+            background: #ffe082;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            padding-bottom: 4rem;
+        }
+
+        .endpoint-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .endpoint-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .endpoint-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background-color: #fafbfc;
+        }
+
+        .method {
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .method.get {
+            background-color: var(--method-get);
+        }
+
+        .method.post {
+            background-color: var(--method-post);
+        }
+
+        .method.all {
+            background-color: var(--method-all);
+        }
+
+        .path {
+            font-family: monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            word-break: break-all;
+        }
+
+        .path .param {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 0 4px;
+            border-radius: 4px;
+        }
+
+        .endpoint-body {
+            padding: 1.5rem;
+        }
+
+        .description {
+            margin-bottom: 1.5rem;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            font-family: 'Consolas', monospace;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        pre:last-child {
+            margin-bottom: 0;
+        }
+
+        .property-list {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .property-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .property-list li:last-child {
+            border-bottom: none;
+        }
+
+        .prop-name {
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--primary-dark);
+            min-width: 120px;
+        }
+
+        .prop-desc {
+            color: var(--text-muted);
+        }
+
+        .prop-req {
+            font-size: 0.75rem;
+            color: #d32f2f;
+            margin-left: 0.5rem;
+            background: #ffebee;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 600px) {
+            .endpoint-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .prop-name {
+                min-width: 100px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>WhatsApp Multi-Session API v2</h1>
+        <p>A highly concurrent, isolated whatsapp microservice designed to handle multiple connections simultaneously
+            without overlap.</p>
+    </header>
+
+    <div class="highlight-notice">
+        <strong>⚠️ Architecture Note:</strong> Every single route requires a dynamic <code>:sessionId</code> parameter
+        in the URL.
+        <br>For example, if "John" wants to use the service, he will call endpoints at
+        <code>/api/v2/whatsapp/john/...</code>.
+        If "Jane" connects, she uses <code>/api/v2/whatsapp/jane/...</code>. This isolates their data and QR
+        environments completely!
+    </div>
+
+    <div class="container">
+
+        <!-- Boot Session -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method all">GET/POST</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/start</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Spins up a headless Chromium container strictly isolated for the string provided in `:sessionId`.
+                    You must run this ONCE before any other commands mapping to this session ID.
+                </div>
+                <div class="section-title">Response Example</div>
+                <pre>{
+    "success": true,
+    "message": "Session marketingTeam initializing..."
+}</pre>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method get">GET</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/status</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Returns the connection state for the specific isolated session.
+                </div>
+                <div class="section-title">Response Example</div>
+                <pre>{
+    "sessionId": "marketingTeam",
+    "ready": true,
+    "status": "connected"
+}</pre>
+            </div>
+        </div>
+
+        <!-- QR Code -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method get">GET</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/qr</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Retrieves the QR code base64 image (if the given session is awaiting to be scanned). Note that
+                    puppeteer boot takes up to 8 seconds so the QR may instantly not be available upon calling `/start`.
+                </div>
+            </div>
+        </div>
+
+        <!-- Pairing Code -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/pair</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Alternative code pairing. Generates an 8-digit OTP string. (Client session must be initialized but
+                    NOT already connected).
+                </div>
+                <div class="section-title">Body Parameters</div>
+                <ul class="property-list">
+                    <li>
+                        <span class="prop-name">phone</span>
+                        <span class="prop-desc">Phone to pair.<span class="prop-req">Required</span></span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Send Message -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/send</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Sends a text message using the specified connection pipeline.
+                </div>
+                <div class="section-title">Body Parameters</div>
+                <ul class="property-list">
+                    <li>
+                        <span class="prop-name">phone</span>
+                        <span class="prop-desc">Target phone.<span class="prop-req">Required</span></span>
+                    </li>
+                    <li>
+                        <span class="prop-name">message</span>
+                        <span class="prop-desc">Text.<span class="prop-req">Required</span></span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Send Media -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/send-receipt</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Sends a document/image utilizing Base64 binary.
+                </div>
+                <div class="section-title">Body Parameters</div>
+                <ul class="property-list">
+                    <li>
+                        <span class="prop-name">phone</span>
+                        <span class="prop-desc">Target phone.<span class="prop-req">Required</span></span>
+                    </li>
+                    <li>
+                        <span class="prop-name">base64Data</span>
+                        <span class="prop-desc">Binary base64.<span class="prop-req">Required</span></span>
+                    </li>
+                    <li>
+                        <span class="prop-name">mimetype</span>
+                        <span class="prop-desc">E.g., "application/pdf"</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Send Bulk -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/send-bulk</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Background throttled mass-messaging utilizing the specified session worker.
+                </div>
+                <div class="section-title">Request Example</div>
+                <pre>{
+    "messages": [
+        { "phone": "1234567890", "message": "Offer A" },
+        { "phone": "0987654321", "message": "Offer B" }
+    ]
+}</pre>
+            </div>
+        </div>
+
+        <!-- Get Chat -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method get">GET</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/messages</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Extracts recent chat history from a thread.
+                </div>
+                <div class="section-title">Usage Example</div>
+                <pre>GET /api/v2/whatsapp/john/messages?phone=9876543210&limit=15</pre>
+            </div>
+        </div>
+
+        <!-- Logout/Destroy -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v2/whatsapp/<span class="param">:sessionId</span>/logout</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="description">
+                    Safely disconnects this specific session from WhatsApp, kills the puppeteer browser safely, and
+                    erases local session memory allowing it to be spun up freshly again next time.
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>
