@@ -28,6 +28,16 @@ app.get("/docs", (req, res) => {
 // Setup Mount point
 app.use("/api", apiRoutes);
 
+// Global Catch-all 404
+app.use((req, res) => {
+    res.status(404).json({
+        error: "Endpoint Not Found",
+        message: `The path '${req.originalUrl}' is not recognized by this microservice.`,
+        hint: "All API actions are now condensed into 'POST /api/whatsapp'.",
+        docs: "/docs"
+    });
+});
+
 // Export the Express App for serverless (Vercel) configurations
 module.exports = app;
 

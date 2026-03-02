@@ -66,8 +66,8 @@ router.all("/whatsapp", async (req, res) => {
                 if (!session) return res.status(404).json({ error: "Session not found." });
                 if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
 
-                var phone = req.body?.phone || req.body?.data?.phone;
-                var message = req.body?.message || req.body?.data?.message;
+                var phone = req.body?.phone || req.query?.phone || req.body?.data?.phone;
+                var message = req.body?.message || req.query?.message || req.body?.data?.message;
 
                 if (!phone || !message) return res.status(400).json({ error: "Missing phone or message parameter" });
 
@@ -85,11 +85,11 @@ router.all("/whatsapp", async (req, res) => {
                 if (!session) return res.status(404).json({ error: "Session not found." });
                 if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
 
-                var base64Data = req.body?.base64Data || req.body?.data?.base64Data;
-                var phoneR = req.body?.phone || req.body?.data?.phone;
-                var mimetype = req.body?.mimetype || req.body?.data?.mimetype;
-                var filename = req.body?.filename || req.body?.data?.filename;
-                var caption = req.body?.caption || req.body?.data?.caption;
+                var base64Data = req.body?.base64Data || req.query?.base64Data || req.body?.data?.base64Data;
+                var phoneR = req.body?.phone || req.query?.phone || req.body?.data?.phone;
+                var mimetype = req.body?.mimetype || req.query?.mimetype || req.body?.data?.mimetype;
+                var filename = req.body?.filename || req.query?.filename || req.body?.data?.filename;
+                var caption = req.body?.caption || req.query?.caption || req.body?.data?.caption;
 
                 if (!phoneR || !base64Data) {
                     return res.status(400).json({ error: "Missing phone or base64Data parameter" });
@@ -113,7 +113,12 @@ router.all("/whatsapp", async (req, res) => {
                 if (!session) return res.status(404).json({ error: "Session not found." });
                 if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
 
-                var messages = req.body?.messages || req.body?.data?.messages;
+                var messages = req.body?.messages || req.query?.messages || req.body?.data?.messages;
+                // If provided via query, it might be a JSON string
+                if (typeof messages === 'string') {
+                    try { messages = JSON.parse(messages); } catch (e) { }
+                }
+
                 if (!Array.isArray(messages) || messages.length === 0) {
                     return res.status(400).json({ error: "Messages array is required" });
                 }
@@ -143,8 +148,8 @@ router.all("/whatsapp", async (req, res) => {
                 if (!session) return res.status(404).json({ error: "Session not found." });
                 if (!session.ready) return res.status(503).json({ error: "WhatsApp not connected" });
 
-                var chatPhone = req.body?.phone || req.body?.data?.phone || req.query?.phone;
-                var fetchLimit = parseInt(req.body?.limit || req.body?.data?.limit || req.query?.limit) || 20;
+                var chatPhone = req.body?.phone || req.query?.phone || req.body?.data?.phone;
+                var fetchLimit = parseInt(req.body?.limit || req.query?.limit || req.body?.data?.limit) || 20;
 
                 if (!chatPhone) return res.status(400).json({ error: "Phone number parameter is required" });
 
@@ -166,7 +171,7 @@ router.all("/whatsapp", async (req, res) => {
 
             case "pair":
                 if (!session) return res.status(404).json({ error: "Session not found. Call 'start' first." });
-                var pPhone = req.body?.phone || req.body?.data?.phone;
+                var pPhone = req.body?.phone || req.query?.phone || req.body?.data?.phone;
                 if (!pPhone) return res.status(400).json({ error: "Phone number parameter is required" });
 
                 if (session.ready) {
@@ -196,6 +201,27 @@ router.all("/whatsapp", async (req, res) => {
         console.error(`[${sessionId}] ACTION ERROR (${action}):`, error);
         return res.status(500).json({ error: error.message });
     }
+});
+
+// 🧭 CATCH-ALL FOR OLD ENDPOINTS (Graceful guidance)
+router.use("/", (req, res) => {
+    // This will catch any route starting with /whatsapp that wasn't exactly /whatsapp (which is handled above)
+    // or any other route mounted on this router.
+    const attemptedPath = req.path;
+    res.status(404).json({
+        error: "Endpoint Not Found",
+        message: `The path '${attemptedPath}' is not recognized.`,
+        instruction: "This API now uses a Unified Gateway. Send a POST request to '/api/whatsapp' with an 'action' property in the JSON body.",
+        example: {
+            url: "/api/whatsapp",
+            method: "POST",
+            body: {
+                action: attemptedPath.split("/")[1] || "status",
+                sessionId: "default"
+            }
+        },
+        docs: "/docs"
+    });
 });
 
 module.exports = router;
