@@ -1,55 +1,99 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
-const apiRoutes = require("./src/routes");
+import dotenv from 'dotenv';
 
-const path = require("path");
+dotenv.config();
+
+import express from 'express';
+import cors from 'cors';
+import { whatsappRoutes, initWhatsApp } from './whatsapp/index.js';
+
+// ─── Global crash guards ─────────────────────────────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('\x1b[33m%s\x1b[0m', '⚠️  Unhandled Rejection (server kept alive):', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('\x1b[31m%s\x1b[0m', '🔥 Uncaught Exception (server kept alive):', err.message);
+    if (err.message?.includes('out of memory') || err.message?.includes('ENOMEM')) {
+        process.exit(1);
+    }
+});
 
 const app = express();
+const PORT = process.env.PORT || 5005;
 
-// Increase JSON limit depending on base64 payloads size
+// Middleware
 app.use(cors());
-app.use(bodyParser.json({ limit: "50mb" }));
+app.use(express.json({ limit: '10mb' }));
 
-// Root health check
-app.get("/", (req, res) => {
-    res.json({ status: "Microservice running", info: "POST to /api/whatsapp with an 'action' payload. Visit /docs for more info." });
-});
-
-app.get("/health", (req, res) => {
-    res.json({ status: "ok" });
-});
-
-// API Docs redirect
-app.get("/docs", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "api-docs.html"));
-});
-
-// Setup Mount point
-app.use("/api", apiRoutes);
-
-// Global Catch-all 404
-app.use((req, res) => {
-    res.status(404).json({
-        error: "Endpoint Not Found",
-        message: `The path '${req.originalUrl}' is not recognized by this microservice.`,
-        hint: "All API actions are now condensed into 'POST /api/whatsapp'.",
-        docs: "/docs"
+// Health Check
+app.get('/', (req, res) => {
+    res.json({
+        status: 'WhatsApp Service is running',
+        port: PORT,
+        endpoints: [
+            '/api/whatsapp/status',
+            '/api/whatsapp/qr',
+            '/api/whatsapp/pair',
+            '/api/whatsapp/send',
+            '/api/whatsapp/send-bulk',
+            '/api/whatsapp/send-receipt',
+            '/api/whatsapp/messages',
+            '/api/whatsapp/logout',
+            '/api/whatsapp/restart',
+        ]
     });
 });
 
-// Export the Express App for serverless (Vercel) configurations
-module.exports = app;
+// ─── API Key Authentication Middleware (FIX C2) ───────────────────────────────
+// Protects all WhatsApp API routes. Set WA_API_KEY in your .env file and
+// pass x-api-key header from the main backend when calling this service.
+const apiKeyAuth = (req, res, next) => {
+    const apiKey = process.env.WA_API_KEY;
 
-// Listen if run directly via Node / nodemon
-if (require.main === module) {
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-        console.log(`\ud83d\ude80 Multi-Session WhatsApp API Microservice running on port ${PORT}`);
-        console.log(`🚀 Docs Available at: http://localhost:${PORT}/docs`);
-        console.log(`-----------------------------------------------------`);
-        console.log(`Unified Endpoint:  POST /api/whatsapp`);
-        console.log(`Send JSON Payload: { "action": "start", "sessionId": "default" }`);
-        console.log(`-----------------------------------------------------\n`);
-    });
+    // If WA_API_KEY is not configured, block all access in production
+    if (!apiKey) {
+        if (process.env.NODE_ENV === 'production') {
+            return res.status(503).json({ success: false, error: 'WhatsApp service not configured.' });
+        }
+        // Allow in dev without a key (but warn)
+        console.warn('[WA-Auth] WARNING: WA_API_KEY not set — running without auth in dev mode');
+        return next();
+    }
+
+    const providedKey = req.headers['x-api-key'];
+    if (!providedKey || providedKey !== apiKey) {
+        return res.status(401).json({ success: false, error: 'Unauthorized: Invalid or missing API key.' });
+    }
+
+    next();
+};
+
+// API Routes (auth-protected)
+app.use('/api/whatsapp', apiKeyAuth, whatsappRoutes);
+
+const startServer = async () => {
+    try {
+        // Boot WhatsApp client (no DB needed — uses in-memory stores)
+        initWhatsApp().catch(err => console.error('WhatsApp init error:', err.message));
+
+        app.listen(PORT, () => {
+            console.log(`\x1b[36m%s\x1b[0m`, `─────────────────────────────────────────────────────`);
+            console.log(`\x1b[35m%s\x1b[0m`, `📱 WhatsApp Service running on http://localhost:${PORT}`);
+            console.log(`\x1b[33m%s\x1b[0m`, `📋 API Endpoints:`);
+            console.log(`   GET  /api/whatsapp/status`);
+            console.log(`   GET  /api/whatsapp/qr`);
+            console.log(`   POST /api/whatsapp/send`);
+            console.log(`   POST /api/whatsapp/logout`);
+            console.log(`   POST /api/whatsapp/restart`);
+            console.log(`\x1b[36m%s\x1b[0m`, `─────────────────────────────────────────────────────`);
+        });
+    } catch (err) {
+        console.error('❌ Failed to start WhatsApp service:', err.message);
+        process.exit(1);
+    }
+};
+
+export default app;
+
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    startServer();
 }
